@@ -1,11 +1,9 @@
-
 use super::libnx;
 use super::LibnxError;
 use libnx::lang_items::c_void;
+use std::mem;
 use std::mem::size_of;
 use std::slice;
-use std::mem;
-
 
 mod payloads;
 pub use self::payloads::*;
@@ -16,47 +14,49 @@ pub use self::domain::*;
 mod session;
 pub use self::session::*;
 
+pub const IPC_MAX_BUFFERS: usize = 8;
+pub const IPC_MAX_OBJECTS: usize = 8;
 
+pub const SFCI_MAGIC: u32 = 0x49434653;
+pub const SFCO_MAGIC: u32 = 0x4f434653;
 
-pub const IPC_MAX_BUFFERS : usize = 8;
-pub const IPC_MAX_OBJECTS : usize = 8;
-
-pub const SFCI_MAGIC : u32 = 0x49434653;
-pub const SFCO_MAGIC : u32 = 0x4f434653;
-
-pub struct IpcCommandHeader<ArgsType : IpcCommandWriteable> {
-    inner : libnx::IpcCommand,
-    payload : ArgsType,
+pub struct IpcCommandHeader<ArgsType: IpcCommandWriteable> {
+    inner: libnx::IpcCommand,
+    payload: ArgsType,
 }
 
-impl <ArgsType : IpcCommandWriteable> IpcCommandHeader<ArgsType> {
-    pub fn with_args(payload : ArgsType) -> IpcCommandHeader<ArgsType> {
-        let inner = unsafe{ mem::zeroed() };
-        IpcCommandHeader {
-            inner,
-            payload,
-        }
+impl<ArgsType: IpcCommandWriteable> IpcCommandHeader<ArgsType> {
+    pub fn with_args(payload: ArgsType) -> IpcCommandHeader<ArgsType> {
+        let inner = unsafe { mem::zeroed() };
+        IpcCommandHeader { inner, payload }
     }
 
-    pub fn add_buffer<T : Sized>(&mut self, buffer : &[T], kind : BufferType, direction : BufferDirection) {
+    pub fn add_buffer<T: Sized>(
+        &mut self,
+        buffer: &[T],
+        kind: BufferType,
+        direction: BufferDirection,
+    ) {
         let buffer_ptr = buffer as *const [T] as *const c_void;
         let byte_count = buffer.len() * size_of::<T>();
         let off = match direction {
             BufferDirection::Send => self.inner.NumSend,
             BufferDirection::Recieve => self.inner.NumSend + self.inner.NumRecv,
-            BufferDirection::Exchange => self.inner.NumSend + self.inner.NumRecv + self.inner.NumExch
+            BufferDirection::Exchange => {
+                self.inner.NumSend + self.inner.NumRecv + self.inner.NumExch
+            }
         };
         self.inner.Buffers[off] = buffer_ptr;
         self.inner.BufferSizes[off] = byte_count;
         self.inner.BufferTypes[off] = kind.to_raw();
         match direction {
-            BufferDirection::Send => {self.inner.NumSend += 1},
-            BufferDirection::Recieve => {self.inner.NumRecv += 1},
-            BufferDirection::Exchange => {self.inner.NumExch += 1},
+            BufferDirection::Send => self.inner.NumSend += 1,
+            BufferDirection::Recieve => self.inner.NumRecv += 1,
+            BufferDirection::Exchange => self.inner.NumExch += 1,
         }
     }
 
-    pub fn add_static<T : Sized>(&mut self, buffer : &[T], index : u8, direction : StaticDirection) {
+    pub fn add_static<T: Sized>(&mut self, buffer: &[T], index: u8, direction: StaticDirection) {
         let buffer_ptr = buffer as *const [T] as *const c_void;
         let byte_count = buffer.len() * size_of::<T>();
         let buffer_index = (index as usize) * size_of::<T>();
@@ -68,136 +68,149 @@ impl <ArgsType : IpcCommandWriteable> IpcCommandHeader<ArgsType> {
         self.inner.StaticSizes[off] = byte_count;
         self.inner.StaticIndices[off] = buffer_index as u8;
         match direction {
-            StaticDirection::Send => {self.inner.NumStaticIn += 1},
-            StaticDirection::Recieve => {self.inner.NumStaticOut += 1},
+            StaticDirection::Send => self.inner.NumStaticIn += 1,
+            StaticDirection::Recieve => self.inner.NumStaticOut += 1,
         }
     }
-    pub fn send_handle(&mut self, handle : IpcSession, direction : HandleDirection) {
+    pub fn send_handle(&mut self, handle: IpcSession, direction: HandleDirection) {
         let off = match direction {
             HandleDirection::Copy => self.inner.NumHandlesCopy,
             HandleDirection::Move => self.inner.NumHandlesMove + self.inner.NumHandlesCopy,
         };
-        self.inner.Handles[off] = handle.handle; 
+        self.inner.Handles[off] = handle.handle;
         match direction {
-            HandleDirection::Copy => { self.inner.NumHandlesCopy += 1},
-            HandleDirection::Move => { self.inner.NumHandlesMove += 1},
+            HandleDirection::Copy => self.inner.NumHandlesCopy += 1,
+            HandleDirection::Move => self.inner.NumHandlesMove += 1,
         };
     }
-    pub fn set_send_pid_flag(&mut self, new_flag : bool) {
+    pub fn set_send_pid_flag(&mut self, new_flag: bool) {
         self.inner.SendPid = new_flag;
     }
 
-    pub fn write_header(&self, buf : &mut [u32]) {
+    pub fn write_header(&self, buf: &mut [u32]) {
         let mut idx = 0;
 
-        let num_static_part : u32 = (self.inner.NumStaticIn << 16) as u32;
-        let num_send_part : u32 = (self.inner.NumSend << 20) as u32;
-        let num_recv_part : u32 = (self.inner.NumRecv << 24) as u32;
-        let num_exch_part : u32 = (self.inner.NumExch << 28) as u32;
-        buf[idx] = (IpcCommandType::Control.to_raw() as u32) | num_static_part | num_recv_part | num_exch_part | num_send_part;
+        let num_static_part: u32 = (self.inner.NumStaticIn << 16) as u32;
+        let num_send_part: u32 = (self.inner.NumSend << 20) as u32;
+        let num_recv_part: u32 = (self.inner.NumRecv << 24) as u32;
+        let num_exch_part: u32 = (self.inner.NumExch << 28) as u32;
+        buf[idx] = (IpcCommandType::Control.to_raw() as u32)
+            | num_static_part
+            | num_recv_part
+            | num_exch_part
+            | num_send_part;
         idx += 1;
         let fill_in_size_later_idx = idx;
 
         if self.inner.NumStaticOut > 0 {
-            buf[idx]= ( (self.inner.NumStaticOut + 2) << 10 ) as u32;
-        }
-        else {
-            buf[idx]= 0;
+            buf[idx] = ((self.inner.NumStaticOut + 2) << 10) as u32;
+        } else {
+            buf[idx] = 0;
         }
 
         if self.inner.SendPid || self.inner.NumHandlesCopy > 0 || self.inner.NumHandlesMove > 0 {
             buf[idx] |= 0x80000000;
             idx += 1;
             let send_pid_bit = if self.inner.SendPid { 1u32 } else { 0u32 };
-            buf[idx] = send_pid_bit | (self.inner.NumHandlesCopy << 1) as u32 | (self.inner.NumHandlesMove << 5) as u32;
+            buf[idx] = send_pid_bit
+                | (self.inner.NumHandlesCopy << 1) as u32
+                | (self.inner.NumHandlesMove << 5) as u32;
             idx += 1;
 
             if self.inner.SendPid {
                 idx += 2;
             }
 
-            for i in 0 .. (self.inner.NumHandlesCopy + self.inner.NumHandlesMove) {
+            for i in 0..(self.inner.NumHandlesCopy + self.inner.NumHandlesMove) {
                 buf[idx] = self.inner.Handles[i];
                 idx += 1;
             }
-        }
-        else {
+        } else {
             idx += 1;
         }
 
-        for i in 0 .. self.inner.NumStaticIn {
+        for i in 0..self.inner.NumStaticIn {
             let static_addr = self.inner.Statics[i] as usize as u64;
             let lower_addr_word = (static_addr & u32::max_value() as u64) as u32;
 
             let upper_addr_bits = (static_addr >> 32) as u32;
-            let packed_word =(self.inner.StaticIndices[i] as u32) | (self.inner.StaticSizes[i] << 16) as u32 | ((upper_addr_bits & 15) << 12) | (((upper_addr_bits >> 4) & 15) << 6);
+            let packed_word = (self.inner.StaticIndices[i] as u32)
+                | (self.inner.StaticSizes[i] << 16) as u32
+                | ((upper_addr_bits & 15) << 12)
+                | (((upper_addr_bits >> 4) & 15) << 6);
             buf[idx] = packed_word;
             buf[idx + 1] = lower_addr_word;
             idx += 2;
         }
 
-        for i in 0 .. (self.inner.NumSend + self.inner.NumRecv + self.inner.NumExch) {
+        for i in 0..(self.inner.NumSend + self.inner.NumRecv + self.inner.NumExch) {
             let buffer_addr = self.inner.Buffers[i] as usize;
             buf[idx] = self.inner.BufferSizes[i] as u32;
             buf[idx + 1] = (buffer_addr & u32::max_value() as usize) as u32;
-            buf[idx + 2] = (((buffer_addr >> 32) & 15) << 28) as u32 | ((buffer_addr >> 36) << 2) as u32 | self.inner.BufferTypes[i];
+            buf[idx + 2] = (((buffer_addr >> 32) & 15) << 28) as u32
+                | ((buffer_addr >> 36) << 2) as u32
+                | self.inner.BufferTypes[i];
             idx += 3;
         }
 
         let padding = (4 - ((idx) % 4)) % 4;
         idx += padding;
-        let _raw_idx = idx; 
+        let _raw_idx = idx;
         let mut raw_size = self.payload.word_count();
-        self.payload.write(&mut buf[idx ..]);
+        self.payload.write(&mut buf[idx..]);
         idx += raw_size as usize;
 
-
-        for i in 0 .. self.inner.NumStaticOut {
+        for i in 0..self.inner.NumStaticOut {
             let off = self.inner.NumStaticIn + i;
             let sz = self.inner.StaticSizes[off];
-            let to_output : u16= if sz > u16::max_value() as usize { 0 } else { sz as u16};
-            if i%2 == 0 {
-                buf[idx] |= (to_output << 16) as u32; 
-            }
-            else {
+            let to_output: u16 = if sz > u16::max_value() as usize {
+                0
+            } else {
+                sz as u16
+            };
+            if i % 2 == 0 {
+                buf[idx] |= (to_output << 16) as u32;
+            } else {
                 buf[idx] |= to_output as u32;
                 idx += 1;
             }
         }
 
-        let u16s_size = ((2*self.inner.NumStaticOut) + 3)/4;
+        let u16s_size = ((2 * self.inner.NumStaticOut) + 3) / 4;
         idx += u16s_size;
         raw_size += u16s_size as u32;
 
         buf[fill_in_size_later_idx] |= raw_size;
 
-        for i in 0 ..self.inner.NumStaticOut {
+        for i in 0..self.inner.NumStaticOut {
             let off = self.inner.NumStaticIn + i;
             let static_addr = self.inner.Statics[off] as usize;
             let lower_addr_word = (static_addr & u32::max_value() as usize) as u32;
 
             let upper_addr_bits = (static_addr >> 32) as u32;
-            let packed_word =(self.inner.StaticIndices[i] as u32) | (self.inner.StaticSizes[i] << 16) as u32 | ((upper_addr_bits & 15) << 12) | (((upper_addr_bits >> 4) & 15) << 6);
+            let packed_word = (self.inner.StaticIndices[i] as u32)
+                | (self.inner.StaticSizes[i] << 16) as u32
+                | ((upper_addr_bits & 15) << 12)
+                | (((upper_addr_bits >> 4) & 15) << 6);
 
             buf[idx] = lower_addr_word;
             buf[idx + 1] = packed_word;
             idx += 2;
         }
     }
-
 }
 
-pub struct IpcCommandMessage<T : IpcCommandReadable> {
-    inner : libnx::IpcParsedCommand,
-    data : T,
+pub struct IpcCommandMessage<T: IpcCommandReadable> {
+    inner: libnx::IpcParsedCommand,
+    data: T,
 }
 
-impl <T : IpcCommandReadable> IpcCommandMessage <T> {
-    pub fn parse_from_buffer(buffer : &[u32]) -> IpcCommandMessage<T> {
-        let mut r : libnx::IpcParsedCommand = unsafe {mem::zeroed()};
+impl<T: IpcCommandReadable> IpcCommandMessage<T> {
+    pub fn parse_from_buffer(buffer: &[u32]) -> IpcCommandMessage<T> {
+        let mut r: libnx::IpcParsedCommand = unsafe { mem::zeroed() };
 
-        let ctrl0 : u32 = buffer[0];
-        let ctrl1 : u32 = buffer[1];
+        let ctrl0: u32 = buffer[0];
+        let ctrl1: u32 = buffer[1];
 
         let mut idx = 2;
 
@@ -208,12 +221,12 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
         r.HasPid = false;
         r.RawSize = ((ctrl1 & 0x1ff) * 4) as usize;
         r.NumHandles = 0;
-        
+
         r.NumStaticsOut = (ctrl1 as usize >> 10) & 15;
         if r.NumStaticsOut >> 1 != 0 {
             r.NumStaticsOut -= 1; // Value 2  . Single descriptor
         }
-        if r.NumStaticsOut >> 1 != 0 { 
+        if r.NumStaticsOut >> 1 != 0 {
             r.NumStaticsOut -= 1; // Value 3+ . (Value - 2) descriptors
         }
 
@@ -239,7 +252,7 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
                 num_handles = IPC_MAX_OBJECTS;
             }
 
-            for i in 0 .. num_handles {
+            for i in 0..num_handles {
                 r.Handles[i] = buffer[idx + i];
                 r.WasHandleCopied[i] = i < num_handles_copy;
             }
@@ -249,7 +262,7 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
         }
 
         let mut num_statics = (ctrl0 as usize >> 16) & 15;
-        let idx_after_statics = idx + num_statics*2;
+        let idx_after_statics = idx + num_statics * 2;
 
         if num_statics > IPC_MAX_BUFFERS {
             num_statics = IPC_MAX_BUFFERS;
@@ -259,8 +272,10 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
             let static_packed = buffer[idx] as usize;
             let static_addr = buffer[idx + 1];
 
-            r.Statics[i] = (static_addr as usize | (((static_packed >> 12) & 15) << 32) | (((static_packed >> 6) & 15) << 36)) as *mut _;
-            r.StaticSizes[i]   = static_packed >> 16;
+            r.Statics[i] = (static_addr as usize
+                | (((static_packed >> 12) & 15) << 32)
+                | (((static_packed >> 6) & 15) << 36)) as *mut _;
+            r.StaticSizes[i] = static_packed >> 16;
             r.StaticIndices[i] = (static_packed & 63) as u8;
 
             idx += 2;
@@ -298,8 +313,8 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
         }
         r.NumBuffers = num_bufs as usize;
         let mut retval = IpcCommandMessage {
-            inner : r, 
-            data : data
+            inner: r,
+            data: data,
         };
         retval.inner.Raw = &retval.data as *const _ as *mut _;
         return retval;
@@ -307,8 +322,8 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
 
     pub unsafe fn parse_from_tls() -> IpcCommandMessage<T> {
         let tls_ptr = get_tls_space() as *mut u32;
-        let tls_len : usize = 0xFF; //TODO: how can we pre-calculate how big this should be? Dow we even care?
-        let tls_slice : &mut [u32] = slice::from_raw_parts_mut(tls_ptr, tls_len);
+        let tls_len: usize = 0xFF; //TODO: how can we pre-calculate how big this should be? Dow we even care?
+        let tls_slice: &mut [u32] = slice::from_raw_parts_mut(tls_ptr, tls_len);
         Self::parse_from_buffer(tls_slice)
     }
 
@@ -316,61 +331,60 @@ impl <T : IpcCommandReadable> IpcCommandMessage <T> {
         &self.data
     }
 
-    pub fn buffers<'a>(&'a self) -> impl Iterator<Item=BufferInfo> + 'a {
+    pub fn buffers<'a>(&'a self) -> impl Iterator<Item = BufferInfo> + 'a {
         let ptr_itr = self.inner.Buffers.iter();
         let sizes_itr = self.inner.BufferSizes.iter();
         let kinds_itr = self.inner.BufferTypes.iter();
         let dir_itr = self.inner.BufferDirections.iter();
 
         let info_itr = ptr_itr.zip(sizes_itr.zip(kinds_itr.zip(dir_itr)));
-        info_itr.map(|(&address, (&size, (&knd, &dir)))|{
+        info_itr.map(|(&address, (&size, (&knd, &dir)))| {
             let kind = BufferType::from_raw(knd);
             let direction = BufferDirection::from_raw(dir).unwrap();
             BufferInfo {
-                address : address as *const _, 
-                size, 
-                kind, 
-                direction
+                address: address as *const _,
+                size,
+                kind,
+                direction,
             }
         })
     }
 
     pub fn handles(&self) -> &[libnx::Handle] {
-        &self.inner.Handles[0 .. self.inner.NumHandles]    
+        &self.inner.Handles[0..self.inner.NumHandles]
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BufferInfo {
-    pub address : *const c_void,
-    pub size : usize, 
-    pub kind : BufferType, 
-    pub direction : BufferDirection,
+    pub address: *const c_void,
+    pub size: usize,
+    pub kind: BufferType,
+    pub direction: BufferDirection,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum BufferType {
     Normal,
-    Type1, 
-    Invalid, 
+    Type1,
+    Invalid,
     Type3,
 }
 
 impl BufferType {
-    pub fn from_raw(raw : u32) -> Self {
+    pub fn from_raw(raw: u32) -> Self {
         match raw {
             0 => BufferType::Normal,
-            1 => BufferType::Type1, 
+            1 => BufferType::Type1,
             3 => BufferType::Type3,
-            _ => BufferType::Invalid, 
+            _ => BufferType::Invalid,
         }
-
     }
     pub fn to_raw(self) -> u32 {
         match self {
             BufferType::Normal => 0,
-            BufferType::Type1 => 1, 
-            BufferType::Invalid => 2, 
+            BufferType::Type1 => 1,
+            BufferType::Invalid => 2,
             BufferType::Type3 => 3,
         }
     }
@@ -378,46 +392,46 @@ impl BufferType {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum BufferDirection {
-    Send, 
-    Recieve, 
+    Send,
+    Recieve,
     Exchange,
 }
 
 impl BufferDirection {
-    pub fn from_raw(raw : u32) -> Option<Self> {
+    pub fn from_raw(raw: u32) -> Option<Self> {
         match raw {
-            0 => Some(BufferDirection::Send), 
-            1 => Some(BufferDirection::Recieve), 
-            2 => Some(BufferDirection::Exchange), 
-            _ => None
+            0 => Some(BufferDirection::Send),
+            1 => Some(BufferDirection::Recieve),
+            2 => Some(BufferDirection::Exchange),
+            _ => None,
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct HandleInfo {
-    pub handle : u32, 
-    pub direction : HandleDirection,
+    pub handle: u32,
+    pub direction: HandleDirection,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum HandleDirection {
-    Copy, 
-    Move, 
+    Copy,
+    Move,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct StaticInfo {
-    pub address : *const c_void,
-    pub size : usize, 
-    pub direction : StaticDirection,
-    pub index : u8,
+    pub address: *const c_void,
+    pub size: usize,
+    pub direction: StaticDirection,
+    pub index: u8,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum StaticDirection {
-    Send, 
-    Recieve
+    Send,
+    Recieve,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -433,15 +447,15 @@ pub enum IpcCommandType {
 }
 
 impl IpcCommandType {
-    pub fn from_raw(raw : u8) -> IpcCommandType {
+    pub fn from_raw(raw: u8) -> IpcCommandType {
         match raw {
             1 => IpcCommandType::LegacyRequest,
-            2 => IpcCommandType::Close, 
+            2 => IpcCommandType::Close,
             3 => IpcCommandType::LegacyControl,
             4 => IpcCommandType::Request,
             5 => IpcCommandType::Control,
             6 => IpcCommandType::RequestWithContext,
-            7 => IpcCommandType::ControlWithContext, 
+            7 => IpcCommandType::ControlWithContext,
             _ => IpcCommandType::Invalid,
         }
     }
@@ -449,25 +463,25 @@ impl IpcCommandType {
     pub fn to_raw(&self) -> u8 {
         match *self {
             IpcCommandType::LegacyRequest => 1,
-            IpcCommandType::Close =>  2,
+            IpcCommandType::Close => 2,
             IpcCommandType::LegacyControl => 3,
             IpcCommandType::Request => 4,
             IpcCommandType::Control => 5,
             IpcCommandType::RequestWithContext => 6,
-            IpcCommandType::ControlWithContext =>  7,
+            IpcCommandType::ControlWithContext => 7,
             IpcCommandType::Invalid => 0,
         }
     }
 }
 
 impl From<u8> for IpcCommandType {
-    fn from(raw : u8) -> IpcCommandType {
+    fn from(raw: u8) -> IpcCommandType {
         IpcCommandType::from_raw(raw)
     }
 }
 
 //Thanks roblabla
-#[cfg(all(target_os = "horizon", target_arch="aarch64"))]
+#[cfg(all(target_os = "horizon", target_arch = "aarch64"))]
 pub unsafe fn get_tls_space() -> *mut c_void {
     let addr: *mut c_void;
     asm!("mrs $0, tpidrro_el0" : "=r" (addr));
@@ -477,7 +491,7 @@ pub unsafe fn get_tls_space() -> *mut c_void {
     addr
 }
 
-#[cfg(not(all(target_os = "horizon", target_arch="aarch64")))]
+#[cfg(not(all(target_os = "horizon", target_arch = "aarch64")))]
 pub unsafe fn get_tls_space() -> *mut c_void {
     use std::ptr;
     ptr::null_mut()
@@ -485,13 +499,23 @@ pub unsafe fn get_tls_space() -> *mut c_void {
 
 #[test]
 fn text_example_ipc() {
-    let outbuffer : &[u32] = &[
-        0x00_00_00_04, 0x00_00_0c_09, 0,0,
-        0x49_43_46_53, 0, 0x08, 0, 
-        0x500, 0x0, 0x30, 0x03_00_00_10, 0x00_30_00_00
+    let outbuffer: &[u32] = &[
+        0x00_00_00_04,
+        0x00_00_0c_09,
+        0,
+        0,
+        0x49_43_46_53,
+        0,
+        0x08,
+        0,
+        0x500,
+        0x0,
+        0x30,
+        0x03_00_00_10,
+        0x00_30_00_00,
     ];
 
-    let parsed : IpcCommandMessage<RawIpcArgs>= IpcCommandMessage::parse_from_buffer(&outbuffer);
+    let parsed: IpcCommandMessage<RawIpcArgs> = IpcCommandMessage::parse_from_buffer(&outbuffer);
     let data = parsed.payload();
     println!("{:x?}", data);
     assert_eq!(SFCI_MAGIC, data.raw_words[0]);

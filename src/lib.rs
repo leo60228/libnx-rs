@@ -1,43 +1,42 @@
-#![cfg_attr(feature="sysroot", no_std)]
+#![cfg_attr(feature = "sysroot", no_std)]
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
-#![cfg_attr(not(feature="sysroot"), feature(asm))]
-#[cfg(not(feature="sysroot"))]
+#![cfg_attr(not(feature = "sysroot"), feature(asm))]
+#[cfg(not(feature = "sysroot"))]
 extern crate core;
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 mod error {
 
     #[derive(Debug, Clone)]
     pub struct LibnxError {
-        pub error_code : Option<u32>,
-        pub error_msg : Option<String>
+        pub error_code: Option<u32>,
+        pub error_msg: Option<String>,
     }
 
     impl LibnxError {
-        pub fn from_msg(msg : String) -> LibnxError {
+        pub fn from_msg(msg: String) -> LibnxError {
             LibnxError {
-                error_code : None, 
-                error_msg : Some(msg)
+                error_code: None,
+                error_msg: Some(msg),
             }
         }
-        pub fn from_raw(error : u32) -> LibnxError {
+        pub fn from_raw(error: u32) -> LibnxError {
             LibnxError {
-                error_code : Some(error), 
-                error_msg : None
+                error_code: Some(error),
+                error_msg: None,
             }
         }
     }
 }
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 pub use error::LibnxError;
 
-
 pub mod libnx {
-    #[cfg(features="make_bindings")]
+    #[cfg(features = "make_bindings")]
     pub mod lang_items {
         pub enum c_void {}
         pub type c_char = u8;
@@ -54,38 +53,38 @@ pub mod libnx {
         pub type size_t = u64;
         pub type ssize_t = i64;
         pub type c_float = f32;
-        pub type c_double = f64; 
+        pub type c_double = f64;
     }
 
-    #[cfg(features="make_bindings")]
+    #[cfg(features = "make_bindings")]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-    #[cfg(not(features="make_bindings"))]
+    #[cfg(not(features = "make_bindings"))]
     pub use libnx_bindings::*;
-    
+
 }
-#[cfg(not(features="make_bindings"))]
+#[cfg(not(features = "make_bindings"))]
 mod libnx_bindings;
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 pub mod usbcomms;
 
-#[cfg(not(feature="sysroot"))]
+/*#[cfg(not(feature = "sysroot"))]
 pub mod usbhs;
 
-#[cfg(not(feature="sysroot"))]
-pub mod usb;
+#[cfg(not(feature = "sysroot"))]
+pub mod usb;*/
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 pub mod console;
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 pub mod hid;
 
-#[cfg(not(feature="sysroot"))]
+#[cfg(not(feature = "sysroot"))]
 pub mod fs;
 
-#[cfg(not(feature="sysroot"))]
+/*#[cfg(not(feature = "sysroot"))]
 pub mod ipc;
 
-#[cfg(not(feature="sysroot"))]
-pub mod service;
+#[cfg(not(feature = "sysroot"))]
+pub mod service;*/

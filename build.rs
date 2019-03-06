@@ -1,4 +1,3 @@
-
 #[cfg(not(feature = "make_bindings"))]
 pub fn main() {
     //pas
@@ -31,6 +30,7 @@ mod dynamic {
         // the resulting bindings.
         bindgen::Builder::default()
             .trust_clang_mangling(false)
+            .derive_default(true)
             .use_core()
             .rust_target(bindgen::RustTarget::Nightly)
             .ctypes_prefix("lang_items")

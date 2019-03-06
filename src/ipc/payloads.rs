@@ -1,15 +1,16 @@
-
-
 pub trait IpcCommandWriteable {
-    fn write(&self, buf : &mut [u32]);
+    fn write(&self, buf: &mut [u32]);
     fn word_count(&self) -> u32;
 }
 
-impl <T> IpcCommandWriteable for &[T] where T : IpcCommandWriteable {
-    fn write(&self, buf : &mut [u32]) {
-        let mut idx : u32 = 0; 
+impl<T> IpcCommandWriteable for &[T]
+where
+    T: IpcCommandWriteable,
+{
+    fn write(&self, buf: &mut [u32]) {
+        let mut idx: u32 = 0;
         for itm in self.as_ref().iter() {
-            let cur_buf = &mut buf[idx as usize ..];
+            let cur_buf = &mut buf[idx as usize..];
             if cur_buf.len() < itm.word_count() as usize {
                 break;
             }
@@ -24,7 +25,7 @@ impl <T> IpcCommandWriteable for &[T] where T : IpcCommandWriteable {
 }
 
 impl IpcCommandWriteable for u32 {
-    fn write(&self, buf : &mut [u32]) {
+    fn write(&self, buf: &mut [u32]) {
         buf[0] = *self;
     }
     fn word_count(&self) -> u32 {
@@ -33,7 +34,7 @@ impl IpcCommandWriteable for u32 {
 }
 
 impl IpcCommandWriteable for &[u8] {
-    fn write(&self, buf : &mut [u32]) {
+    fn write(&self, buf: &mut [u32]) {
         for (idx, byte) in self.iter().enumerate() {
             let word_idx = idx / 4usize;
             if word_idx >= buf.len() {
@@ -48,23 +49,22 @@ impl IpcCommandWriteable for &[u8] {
         }
     }
 
-    fn word_count(&self) -> u32{ 
+    fn word_count(&self) -> u32 {
         if self.len() == 0 {
             0
-        }
-        else { 
-            (self.len()/4 + 1) as u32 
+        } else {
+            (self.len() / 4 + 1) as u32
         }
     }
 }
 
 pub trait IpcCommandReadable {
-    fn read(buff : &[u32]) -> Self;
+    fn read(buff: &[u32]) -> Self;
     fn word_count(&self) -> u32;
 }
 
 impl IpcCommandReadable for u32 {
-    fn read(buff : &[u32]) -> Self {
+    fn read(buff: &[u32]) -> Self {
         buff[0]
     }
     fn word_count(&self) -> u32 {
@@ -74,36 +74,34 @@ impl IpcCommandReadable for u32 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RawIpcArgs {
-    pub raw_words : Vec<u32>,
+    pub raw_words: Vec<u32>,
 }
 
 impl RawIpcArgs {
-    pub fn new(raw_words : Vec<u32>) -> Self {
-        RawIpcArgs {
-            raw_words
-        }
+    pub fn new(raw_words: Vec<u32>) -> Self {
+        RawIpcArgs { raw_words }
     }
 }
 
 impl IpcCommandReadable for RawIpcArgs {
-    fn read(buff : &[u32]) -> RawIpcArgs {
+    fn read(buff: &[u32]) -> RawIpcArgs {
         let mut raw_words = Vec::with_capacity(buff.len());
-        unsafe {raw_words.set_len(buff.len())};
+        unsafe { raw_words.set_len(buff.len()) };
         raw_words.copy_from_slice(buff);
 
         RawIpcArgs::new(raw_words)
     }
     fn word_count(&self) -> u32 {
-        self.raw_words.len() as u32 
+        self.raw_words.len() as u32
     }
 }
 
 impl IpcCommandWriteable for RawIpcArgs {
-    fn write(&self, buff : &mut [u32]) {
-        (&mut buff[0 .. self.raw_words.len()]).copy_from_slice(&self.raw_words);
+    fn write(&self, buff: &mut [u32]) {
+        (&mut buff[0..self.raw_words.len()]).copy_from_slice(&self.raw_words);
     }
     fn word_count(&self) -> u32 {
-        self.raw_words.len() as u32 
+        self.raw_words.len() as u32
     }
 }
 
@@ -117,17 +115,15 @@ impl EmptyArgs {
 }
 
 impl IpcCommandReadable for EmptyArgs {
-    fn read(_buf : &[u32]) -> EmptyArgs {
-        EmptyArgs{}
+    fn read(_buf: &[u32]) -> EmptyArgs {
+        EmptyArgs {}
     }
     fn word_count(&self) -> u32 {
         0
     }
 }
 impl IpcCommandWriteable for EmptyArgs {
-    fn write(&self, _buff : &mut [u32]) {
-
-    }
+    fn write(&self, _buff: &mut [u32]) {}
     fn word_count(&self) -> u32 {
         0
     }

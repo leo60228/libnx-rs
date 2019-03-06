@@ -1,18 +1,9 @@
+use super::libnx::{hidKeysDown, hidKeysHeld, hidKeysUp, hidScanInput};
 
-use super::libnx::{
-    hidScanInput, 
-    hidKeysHeld,
-    hidKeysDown,
-    hidKeysUp
-};
-
-
-pub use super::libnx::HidControllerKeys;
 pub use super::libnx::HidControllerID;
+pub use super::libnx::HidControllerKeys;
 
-pub struct HidContext {
-
-}
+pub struct HidContext {}
 
 impl HidContext {
     pub fn new() -> HidContext {
@@ -25,7 +16,7 @@ impl HidContext {
         }
     }
 
-    pub fn get_controller_from_raw(&self, id : u8) -> Controller {
+    pub fn get_controller_from_raw(&self, id: u8) -> Controller {
         match id {
             0 => self.get_controller(HidControllerID::CONTROLLER_PLAYER_1),
             1 => self.get_controller(HidControllerID::CONTROLLER_PLAYER_2),
@@ -37,38 +28,29 @@ impl HidContext {
             7 => self.get_controller(HidControllerID::CONTROLLER_PLAYER_8),
             8 => self.get_controller(HidControllerID::CONTROLLER_HANDHELD),
             9 => self.get_controller(HidControllerID::CONTROLLER_UNKNOWN),
-            _ => self.get_controller(HidControllerID::CONTROLLER_P1_AUTO)
+            _ => self.get_controller(HidControllerID::CONTROLLER_P1_AUTO),
         }
     }
 
-    pub fn get_controller(&self, id : HidControllerID) -> Controller {
-        Controller {
-            controller : id
-        }
+    pub fn get_controller(&self, id: HidControllerID) -> Controller {
+        Controller { controller: id }
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct Controller {
-    controller : HidControllerID
+    controller: HidControllerID,
 }
 
 impl Controller {
-
     pub fn keys_down_raw(&self) -> u64 {
-        unsafe {
-            hidKeysDown(self.controller)
-        }
+        unsafe { hidKeysDown(self.controller) }
     }
     pub fn keys_up_raw(&self) -> u64 {
-        unsafe {
-            hidKeysUp(self.controller)
-        }
+        unsafe { hidKeysUp(self.controller) }
     }
 
     pub fn keys_held_raw(&self) -> u64 {
-        unsafe {
-            hidKeysHeld(self.controller)
-        }
+        unsafe { hidKeysHeld(self.controller) }
     }
 }

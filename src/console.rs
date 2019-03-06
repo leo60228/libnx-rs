@@ -1,17 +1,11 @@
 #![cfg(not(feature="sysroot"))]
 
-use super::libnx::{
-    consoleInit, 
-    PrintConsole,
-    consoleClear,
-    consoleUpdate, 
-    consoleExit
-};
+use super::libnx::{consoleClear, consoleExit, consoleInit, consoleUpdate, PrintConsole};
 
 use std::ptr;
 
 pub struct ConsoleHandle {
-    inner : *mut PrintConsole
+    inner: *mut PrintConsole,
 }
 
 impl ConsoleHandle {
@@ -20,7 +14,7 @@ impl ConsoleHandle {
             consoleInit(ptr::null_mut());
         }
         ConsoleHandle {
-            inner : ptr::null_mut()
+            inner: ptr::null_mut(),
         }
     }
 

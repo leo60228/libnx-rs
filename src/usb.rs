@@ -1,24 +1,23 @@
-
-use super::LibnxError;
 use super::libnx;
 use super::libnx as libnx_bindings;
+use super::LibnxError;
 
 #[derive(Debug, Copy, Clone)]
-pub struct UsbEndpointDescriptor { inner : libnx_bindings::usb_endpoint_descriptor}
+pub struct UsbEndpointDescriptor {
+    inner: libnx_bindings::usb_endpoint_descriptor,
+}
 
 impl From<libnx_bindings::usb_endpoint_descriptor> for UsbEndpointDescriptor {
-    fn from(inner : libnx_bindings::usb_endpoint_descriptor) -> UsbEndpointDescriptor {
+    fn from(inner: libnx_bindings::usb_endpoint_descriptor) -> UsbEndpointDescriptor {
         UsbEndpointDescriptor::from_inner(inner)
     }
 }
 
 impl UsbEndpointDescriptor {
-    pub fn from_inner(inner : libnx_bindings::usb_endpoint_descriptor) -> UsbEndpointDescriptor {
-        UsbEndpointDescriptor {
-            inner
-        }
+    pub fn from_inner(inner: libnx_bindings::usb_endpoint_descriptor) -> UsbEndpointDescriptor {
+        UsbEndpointDescriptor { inner }
     }
-    
+
     pub fn inner(&self) -> libnx_bindings::usb_endpoint_descriptor {
         self.inner
     }
@@ -49,22 +48,20 @@ impl UsbEndpointDescriptor {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum EndpointDirection {
-    IN, 
-    OUT, 
+    IN,
+    OUT,
 }
 
 impl EndpointDirection {
+    const BYTE_MASK: u8 = 0x80;
 
-    const BYTE_MASK : u8 = 0x80;
-    
-    const OUT_BYTE : u8 = libnx_bindings::usb_endpoint_direction_USB_ENDPOINT_OUT as u8;
-    const IN_BYTE : u8 = libnx_bindings::usb_endpoint_direction_USB_ENDPOINT_IN as u8;
+    const OUT_BYTE: u8 = libnx_bindings::usb_endpoint_direction_USB_ENDPOINT_OUT as u8;
+    const IN_BYTE: u8 = libnx_bindings::usb_endpoint_direction_USB_ENDPOINT_IN as u8;
 
-    pub fn from_address_byte(byte : u8) -> EndpointDirection {
+    pub fn from_address_byte(byte: u8) -> EndpointDirection {
         if byte & EndpointDirection::IN_BYTE != 0 {
             EndpointDirection::IN
-        }
-        else {
+        } else {
             EndpointDirection::OUT
         }
     }
@@ -79,7 +76,7 @@ impl EndpointDirection {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum TransferType {
-    CONTROL, 
+    CONTROL,
     ISOCHRONOUS,
     BULK,
     INTERRUPT,
@@ -88,16 +85,15 @@ pub enum TransferType {
 }
 
 impl TransferType {
+    const BYTE_MASK: u8 = 0x03;
 
-    const BYTE_MASK : u8 = 0x03;
+    const CONTROL_BYTE: u8 = 0;
+    const ISO_BYTE: u8 = 1;
+    const BULK_BYTE: u8 = 2;
+    const INTERRUPT_BYTE: u8 = 3;
+    const BULK_STREAM_BYTE: u8 = 4;
 
-    const CONTROL_BYTE : u8 = 0;
-    const ISO_BYTE : u8 = 1;
-    const BULK_BYTE : u8 = 2;
-    const INTERRUPT_BYTE : u8 = 3;
-    const BULK_STREAM_BYTE : u8 = 4;
-
-    pub fn from_address_byte(byte : u8) -> TransferType {
+    pub fn from_address_byte(byte: u8) -> TransferType {
         match (byte & TransferType::BYTE_MASK) {
             TransferType::CONTROL_BYTE => TransferType::CONTROL,
             TransferType::ISO_BYTE => TransferType::ISOCHRONOUS,
@@ -121,20 +117,18 @@ impl TransferType {
 
 #[derive(Clone, Copy, Debug)]
 pub struct UsbInterfaceDescriptor {
-    inner : libnx_bindings::usb_interface_descriptor
+    inner: libnx_bindings::usb_interface_descriptor,
 }
 
 impl UsbInterfaceDescriptor {
-    pub fn from_inner(inner : libnx_bindings::usb_interface_descriptor) -> UsbInterfaceDescriptor {
-        UsbInterfaceDescriptor {
-            inner
-        }
+    pub fn from_inner(inner: libnx_bindings::usb_interface_descriptor) -> UsbInterfaceDescriptor {
+        UsbInterfaceDescriptor { inner }
     }
 
     pub fn inner(&self) -> libnx_bindings::usb_interface_descriptor {
         self.inner
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.inner.bLength == 0
     }
@@ -158,14 +152,12 @@ impl UsbInterfaceDescriptor {
 
 #[derive(Clone, Copy, Debug)]
 pub struct UsbDeviceDescriptor {
-    inner : libnx_bindings::usb_device_descriptor
+    inner: libnx_bindings::usb_device_descriptor,
 }
 
 impl UsbDeviceDescriptor {
-    pub fn from_inner(inner : libnx_bindings::usb_device_descriptor) -> UsbDeviceDescriptor {
-        UsbDeviceDescriptor {
-            inner
-        }
+    pub fn from_inner(inner: libnx_bindings::usb_device_descriptor) -> UsbDeviceDescriptor {
+        UsbDeviceDescriptor { inner }
     }
 
     pub fn inner(&self) -> libnx_bindings::usb_device_descriptor {
@@ -205,16 +197,14 @@ impl UsbDeviceDescriptor {
 
 #[derive(Clone, Copy, Debug)]
 pub struct UsbConfigDescriptor {
-    inner : libnx_bindings::usb_config_descriptor,
+    inner: libnx_bindings::usb_config_descriptor,
 }
 
 impl UsbConfigDescriptor {
-    pub fn from_inner(inner : libnx_bindings::usb_config_descriptor) -> UsbConfigDescriptor {
-        UsbConfigDescriptor {
-            inner
-        }
+    pub fn from_inner(inner: libnx_bindings::usb_config_descriptor) -> UsbConfigDescriptor {
+        UsbConfigDescriptor { inner }
     }
-    
+
     pub fn inner(&self) -> libnx_bindings::usb_config_descriptor {
         self.inner
     }
@@ -229,5 +219,4 @@ impl UsbConfigDescriptor {
     pub fn attributes_byte(&self) -> u8 {
         self.inner.bmAttributes
     }
-
 }
